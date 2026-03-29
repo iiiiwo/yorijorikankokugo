@@ -1,4 +1,28 @@
 -- ============================================================
+-- 完全セットアップ: DROP → CREATE
+-- 既存テーブルをすべて削除して正しいスキーマで作り直す
+-- ※ profiles テーブルは auth.users に依存するため残す
+-- ============================================================
+
+-- 依存関係の逆順で DROP
+DROP TABLE IF EXISTS public.quiz_answers CASCADE;
+DROP TABLE IF EXISTS public.quiz_sessions CASCADE;
+DROP TABLE IF EXISTS public.conversation_messages CASCADE;
+DROP TABLE IF EXISTS public.conversation_sessions CASCADE;
+DROP TABLE IF EXISTS public.user_badges CASCADE;
+DROP TABLE IF EXISTS public.badge_definitions CASCADE;
+DROP TABLE IF EXISTS public.daily_activity CASCADE;
+DROP TABLE IF EXISTS public.vocabulary_progress CASCADE;
+DROP TABLE IF EXISTS public.character_progress CASCADE;
+DROP TABLE IF EXISTS public.vocabulary CASCADE;
+DROP TABLE IF EXISTS public.hangul_characters CASCADE;
+
+-- トリガー・関数も再作成できるよう DROP
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS public.record_activity(UUID, INTEGER, INTEGER);
+
+-- ============================================================
 -- EXTENSIONS
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -6,7 +30,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================
 -- USER PROFILES
 -- ============================================================
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username      TEXT UNIQUE NOT NULL,
   display_name  TEXT,
@@ -22,6 +46,10 @@ CREATE TABLE public.profiles (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile"
