@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { calculateXpForQuiz } from "@/lib/utils/hangul";
@@ -37,7 +37,7 @@ function generateWrongOptions(correct: string, allOptions: string[], count: numb
   return shuffleArray(others).slice(0, count);
 }
 
-export default function MultipleChoicePage() {
+function MultipleChoiceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const scope = searchParams.get("scope") ?? "hangul_all";
@@ -60,7 +60,10 @@ export default function MultipleChoicePage() {
         .select("*")
         .order("position");
 
-      if (!chars) return;
+      if (!chars || chars.length === 0) {
+        setLoading(false);
+        return;
+      }
 
       const filtered = scope === "hangul_consonants"
         ? chars.filter((c) => c.type === "consonant")
@@ -87,7 +90,7 @@ export default function MultipleChoicePage() {
           const wrongOptions = generateWrongOptions(char.character, allChars, 3);
           return {
             id: char.id,
-            question: `「${char.romanization}」（${char.pronunciation_jp}）`,
+            question: `「${char.romanization}」${(char as { pronunciation_jp?: string }).pronunciation_jp ? `（${(char as { pronunciation_jp?: string }).pronunciation_jp}）` : ""}`,
             answer: char.character,
             options: shuffleArray([char.character, ...wrongOptions]),
             type: "hangul" as const,
@@ -107,7 +110,10 @@ export default function MultipleChoicePage() {
       if (!words || words.length === 0) {
         // Fallback to all vocab
         const { data: allWords } = await supabase.from("vocabulary").select("*");
-        if (!allWords) return;
+        if (!allWords || allWords.length === 0) {
+          setLoading(false);
+          return;
+        }
         buildVocabQuestions(allWords);
         return;
       }
@@ -321,5 +327,20 @@ export default function MultipleChoicePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MultipleChoicePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-64">
+        <div className="text-center">
+          <div className="text-4xl mb-4 animate-spin">⭕</div>
+          <p className="text-gray-500">問題を準備中...</p>
+        </div>
+      </div>
+    }>
+      <MultipleChoiceContent />
+    </Suspense>
   );
 }
