@@ -7,24 +7,13 @@ ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS audio_url TEXT;
 ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS examples JSONB;
 ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
 
--- 既存テーブルに japanese_reading 等のレガシーカラムがある場合、NOT NULL制約を解除
-DO $$
-DECLARE
-  col TEXT;
-BEGIN
-  FOREACH col IN ARRAY ARRAY['japanese_reading','reading','jp_reading','japanese','note','category']
-  LOOP
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'hangul_characters'
-        AND column_name = col
-        AND is_nullable = 'NO'
-    ) THEN
-      EXECUTE format('ALTER TABLE public.hangul_characters ALTER COLUMN %I DROP NOT NULL', col);
-    END IF;
-  END LOOP;
-END $$;
+-- 既存テーブルのレガシーカラムの NOT NULL 制約を解除（存在しない場合は無視）
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN japanese_reading DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN reading DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN jp_reading DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN japanese DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN note DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.hangul_characters ALTER COLUMN category DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ============================================================
 -- ハングル文字データ (INSERT OR UPDATE)
