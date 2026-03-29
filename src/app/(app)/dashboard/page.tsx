@@ -9,15 +9,7 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const [
-    { data: profile },
-    { data: recentQuizzes },
-    { data: recentActivity },
-    { data: charCount },
-    { data: charProgress },
-    { data: badges },
-    { data: badgeDefs },
-  ] = await Promise.all([
+  const [p1, p2, p3, p4, p5, p6, p7] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
       .from("quiz_sessions")
@@ -31,17 +23,19 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .order("activity_date", { ascending: false })
       .limit(7),
-    supabase.from("hangul_characters").select("id", { count: "exact" }),
-    supabase
-      .from("character_progress")
-      .select("mastery_level")
-      .eq("user_id", user.id),
-    supabase
-      .from("user_badges")
-      .select("badge_id, earned_at")
-      .eq("user_id", user.id),
+    supabase.from("hangul_characters").select("id"),
+    supabase.from("character_progress").select("mastery_level").eq("user_id", user.id),
+    supabase.from("user_badges").select("badge_id, earned_at").eq("user_id", user.id),
     supabase.from("badge_definitions").select("id, icon, name_jp").limit(6),
   ]);
+  type ProfileRow = { display_name: string | null; streak_days: number; xp_total: number; daily_goal_minutes: number };
+  const profile = p1.data as ProfileRow | null;
+  const recentQuizzes = p2.data as { scope: string; correct_answers: number; total_questions: number; completed_at: string }[] | null;
+  const recentActivity = p3.data as { activity_date: string; xp_earned: number; minutes_studied: number }[] | null;
+  const charCount = p4.data as { id: number }[] | null;
+  const charProgress = p5.data as { mastery_level: number }[] | null;
+  const badges = p6.data as { badge_id: number; earned_at: string }[] | null;
+  const badgeDefs = p7.data as { id: number; icon: string; name_jp: string }[] | null;
 
   const totalChars = charCount?.length ?? 24;
   const learnedChars = (charProgress ?? []).filter((p) => p.mastery_level >= 1).length;
