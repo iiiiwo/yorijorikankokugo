@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     supabase.from("user_badges").select("badge_id, earned_at").eq("user_id", user.id),
     supabase.from("badge_definitions").select("id, icon, name_jp").limit(6),
   ]);
-  type ProfileRow = { display_name: string | null; streak_days: number; xp_total: number; daily_goal_minutes: number };
+  type ProfileRow = { display_name: string | null; username: string | null; streak_days: number; xp_total: number; daily_goal_minutes: number };
   const profile = p1.data as ProfileRow | null;
   const recentQuizzes = p2.data as { scope: string; correct_answers: number; total_questions: number; completed_at: string }[] | null;
   const recentActivity = p3.data as { activity_date: string; xp_earned: number; minutes_studied: number }[] | null;
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
           <div>
             <p className="text-red-100 text-sm mb-1">おかえりなさい！</p>
             <h1 className="text-2xl font-bold">
-              {profile?.display_name ?? "ゲスト"}さん
+              {profile?.display_name ?? profile?.username ?? user.email?.split("@")[0] ?? "ゲスト"}さん
             </h1>
             <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-1.5">
