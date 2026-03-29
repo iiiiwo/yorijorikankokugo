@@ -12,7 +12,7 @@ DO $$
 DECLARE
   col TEXT;
 BEGIN
-  FOREACH col IN ARRAY ARRAY['japanese_reading','reading','jp_reading','japanese','note']
+  FOREACH col IN ARRAY ARRAY['japanese_reading','reading','jp_reading','japanese','note','category']
   LOOP
     IF EXISTS (
       SELECT 1 FROM information_schema.columns
