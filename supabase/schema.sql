@@ -1,30 +1,8 @@
 -- ============================================================
--- 完全セットアップ: DROP → CREATE
--- 既存テーブルをすべて削除して正しいスキーマで作り直す
--- ※ profiles テーブルは auth.users に依存するため残す
+-- SCHEMA: CREATE TABLE IF NOT EXISTS（何度実行してもエラーにならない）
+-- データのリセットは seed.sql を使用すること
 -- ============================================================
 
--- 依存関係の逆順で DROP
-DROP TABLE IF EXISTS public.quiz_answers CASCADE;
-DROP TABLE IF EXISTS public.quiz_sessions CASCADE;
-DROP TABLE IF EXISTS public.conversation_messages CASCADE;
-DROP TABLE IF EXISTS public.conversation_sessions CASCADE;
-DROP TABLE IF EXISTS public.user_badges CASCADE;
-DROP TABLE IF EXISTS public.badge_definitions CASCADE;
-DROP TABLE IF EXISTS public.daily_activity CASCADE;
-DROP TABLE IF EXISTS public.vocabulary_progress CASCADE;
-DROP TABLE IF EXISTS public.character_progress CASCADE;
-DROP TABLE IF EXISTS public.vocabulary CASCADE;
-DROP TABLE IF EXISTS public.hangul_characters CASCADE;
-
--- トリガー・関数も再作成できるよう DROP
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user();
-DROP FUNCTION IF EXISTS public.record_activity(UUID, INTEGER, INTEGER);
-
--- ============================================================
--- EXTENSIONS
--- ============================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
@@ -57,7 +35,7 @@ CREATE POLICY "Users can update own profile"
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Auto-create profile on signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -70,7 +48,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -78,7 +55,7 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- HANGUL CHARACTERS
 -- ============================================================
-CREATE TABLE public.hangul_characters (
+CREATE TABLE IF NOT EXISTS public.hangul_characters (
   id              SERIAL PRIMARY KEY,
   character       TEXT NOT NULL UNIQUE,
   type            TEXT NOT NULL CHECK (type IN ('consonant','vowel')),
@@ -94,7 +71,7 @@ CREATE TABLE public.hangul_characters (
 -- ============================================================
 -- VOCABULARY / WORDS
 -- ============================================================
-CREATE TABLE public.vocabulary (
+CREATE TABLE IF NOT EXISTS public.vocabulary (
   id              SERIAL PRIMARY KEY,
   korean          TEXT NOT NULL,
   romanization    TEXT NOT NULL,
@@ -112,7 +89,7 @@ CREATE TABLE public.vocabulary (
 -- ============================================================
 -- LEARNING PROGRESS — PER USER, PER CHARACTER
 -- ============================================================
-CREATE TABLE public.character_progress (
+CREATE TABLE IF NOT EXISTS public.character_progress (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   character_id    INTEGER NOT NULL REFERENCES public.hangul_characters(id),
@@ -124,13 +101,14 @@ CREATE TABLE public.character_progress (
   UNIQUE(user_id, character_id)
 );
 ALTER TABLE public.character_progress ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own character progress" ON public.character_progress;
 CREATE POLICY "Users manage own character progress"
   ON public.character_progress FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================================
 -- VOCABULARY PROGRESS
 -- ============================================================
-CREATE TABLE public.vocabulary_progress (
+CREATE TABLE IF NOT EXISTS public.vocabulary_progress (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   vocabulary_id   INTEGER NOT NULL REFERENCES public.vocabulary(id),
@@ -142,13 +120,14 @@ CREATE TABLE public.vocabulary_progress (
   UNIQUE(user_id, vocabulary_id)
 );
 ALTER TABLE public.vocabulary_progress ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own vocab progress" ON public.vocabulary_progress;
 CREATE POLICY "Users manage own vocab progress"
   ON public.vocabulary_progress FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================================
 -- QUIZ SESSIONS & RESULTS
 -- ============================================================
-CREATE TABLE public.quiz_sessions (
+CREATE TABLE IF NOT EXISTS public.quiz_sessions (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   quiz_type       TEXT NOT NULL CHECK (quiz_type IN ('multiple_choice','input','mixed')),
@@ -160,10 +139,11 @@ CREATE TABLE public.quiz_sessions (
   completed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.quiz_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own quiz sessions" ON public.quiz_sessions;
 CREATE POLICY "Users view own quiz sessions"
   ON public.quiz_sessions FOR ALL USING (auth.uid() = user_id);
 
-CREATE TABLE public.quiz_answers (
+CREATE TABLE IF NOT EXISTS public.quiz_answers (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   session_id      UUID NOT NULL REFERENCES public.quiz_sessions(id) ON DELETE CASCADE,
   question_ref_type TEXT NOT NULL CHECK (question_ref_type IN ('hangul','vocabulary')),
@@ -178,7 +158,7 @@ CREATE TABLE public.quiz_answers (
 -- ============================================================
 -- CONVERSATION HISTORY
 -- ============================================================
-CREATE TABLE public.conversation_sessions (
+CREATE TABLE IF NOT EXISTS public.conversation_sessions (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   title           TEXT,
@@ -188,10 +168,11 @@ CREATE TABLE public.conversation_sessions (
   last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.conversation_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own conversations" ON public.conversation_sessions;
 CREATE POLICY "Users manage own conversations"
   ON public.conversation_sessions FOR ALL USING (auth.uid() = user_id);
 
-CREATE TABLE public.conversation_messages (
+CREATE TABLE IF NOT EXISTS public.conversation_messages (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   session_id      UUID NOT NULL REFERENCES public.conversation_sessions(id) ON DELETE CASCADE,
   role            TEXT NOT NULL CHECK (role IN ('user','assistant')),
@@ -199,12 +180,13 @@ CREATE TABLE public.conversation_messages (
   corrections     JSONB,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX ON public.conversation_messages(session_id, created_at);
+CREATE INDEX IF NOT EXISTS conversation_messages_session_idx
+  ON public.conversation_messages(session_id, created_at);
 
 -- ============================================================
 -- BADGES / ACHIEVEMENTS
 -- ============================================================
-CREATE TABLE public.badge_definitions (
+CREATE TABLE IF NOT EXISTS public.badge_definitions (
   id          SERIAL PRIMARY KEY,
   key         TEXT NOT NULL UNIQUE,
   name_jp     TEXT NOT NULL,
@@ -214,7 +196,7 @@ CREATE TABLE public.badge_definitions (
   condition   JSONB NOT NULL
 );
 
-CREATE TABLE public.user_badges (
+CREATE TABLE IF NOT EXISTS public.user_badges (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   badge_id        INTEGER NOT NULL REFERENCES public.badge_definitions(id),
@@ -222,6 +204,8 @@ CREATE TABLE public.user_badges (
   UNIQUE(user_id, badge_id)
 );
 ALTER TABLE public.user_badges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own badges" ON public.user_badges;
+DROP POLICY IF EXISTS "Users insert own badges" ON public.user_badges;
 CREATE POLICY "Users view own badges"
   ON public.user_badges FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own badges"
@@ -230,7 +214,7 @@ CREATE POLICY "Users insert own badges"
 -- ============================================================
 -- DAILY ACTIVITY LOG
 -- ============================================================
-CREATE TABLE public.daily_activity (
+CREATE TABLE IF NOT EXISTS public.daily_activity (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   activity_date DATE NOT NULL,
@@ -239,10 +223,10 @@ CREATE TABLE public.daily_activity (
   UNIQUE(user_id, activity_date)
 );
 ALTER TABLE public.daily_activity ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own activity" ON public.daily_activity;
 CREATE POLICY "Users manage own activity"
   ON public.daily_activity FOR ALL USING (auth.uid() = user_id);
 
--- Helper function
 CREATE OR REPLACE FUNCTION public.record_activity(
   p_user_id UUID, p_xp INTEGER, p_minutes INTEGER
 ) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
