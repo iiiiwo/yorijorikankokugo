@@ -1,10 +1,11 @@
 -- ============================================================
--- マイグレーション: hangul_characters に pronunciation_jp カラムを追加
+-- マイグレーション: hangul_characters の不足カラムを追加
 -- ============================================================
-
--- カラムが存在しない場合のみ追加
-ALTER TABLE public.hangul_characters
-  ADD COLUMN IF NOT EXISTS pronunciation_jp TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS pronunciation_jp TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS stroke_count INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS audio_url TEXT;
+ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS examples JSONB;
+ALTER TABLE public.hangul_characters ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0;
 
 -- ============================================================
 -- ハングル文字データ (INSERT OR UPDATE)
