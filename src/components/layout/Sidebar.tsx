@@ -10,6 +10,7 @@ const navItems = [
   { href: "/conversation", icon: "💬", label: "AI会話" },
   { href: "/vocabulary", icon: "📚", label: "単語帳" },
   { href: "/progress", icon: "📊", label: "学習履歴" },
+  { href: "/work-report", icon: "📋", label: "日報作成" },
 ];
 
 export function Sidebar() {

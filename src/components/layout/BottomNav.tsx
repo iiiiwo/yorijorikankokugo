@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/dashboard", icon: "🏠", label: "ホーム" },
-  { href: "/hangul", icon: "한", label: "ハングル" },
   { href: "/quiz", icon: "📝", label: "クイズ" },
   { href: "/conversation", icon: "💬", label: "会話" },
   { href: "/vocabulary", icon: "📚", label: "単語" },
+  { href: "/work-report", icon: "📋", label: "日報" },
 ];
 
 export function BottomNav() {

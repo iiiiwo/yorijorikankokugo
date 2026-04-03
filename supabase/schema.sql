@@ -243,3 +243,42 @@ BEGIN
   WHERE id = p_user_id;
 END;
 $$;
+
+-- ============================================================
+-- WORK REPORTS（日報自動化）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.work_reports (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id              UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  report_date          DATE NOT NULL,
+  overtime_time        TEXT NOT NULL DEFAULT '',
+  overtime_cumulative  DECIMAL(4,1) NOT NULL DEFAULT 0.0,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, report_date)
+);
+ALTER TABLE public.work_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own work reports" ON public.work_reports;
+CREATE POLICY "Users manage own work reports"
+  ON public.work_reports FOR ALL USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS public.work_tasks (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id   UUID NOT NULL REFERENCES public.work_reports(id) ON DELETE CASCADE,
+  task_type   TEXT NOT NULL CHECK (task_type IN ('completed', 'planned')),
+  client      TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT '',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.work_tasks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own work tasks" ON public.work_tasks;
+CREATE POLICY "Users manage own work tasks"
+  ON public.work_tasks FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.work_reports
+      WHERE work_reports.id = work_tasks.report_id
+        AND work_reports.user_id = auth.uid()
+    )
+  );
